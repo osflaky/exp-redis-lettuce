@@ -1,0 +1,231 @@
+/*
+ * Copyright 2011-2025, Redis Ltd. and Contributors
+ * All rights reserved.
+ *
+ * Licensed under the MIT License.
+ */
+package io.lettuce.core.output;
+
+import static io.lettuce.TestTags.UNIT_TEST;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+
+import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.codec.StringCodec;
+import io.lettuce.core.search.Suggestion;
+import io.lettuce.core.search.SuggestionParser;
+
+/**
+ * Unit tests for {@link SuggestionParser}.
+ *
+ * @author Tihomir Mateev
+ */
+@Tag(UNIT_TEST)
+class SuggestionParserUnitTests {
+
+    @Test
+    void shouldParseBasicSuggestions() {
+        SuggestionParser parser = new SuggestionParser(false, false);
+        ArrayComplexData data = new ArrayComplexData(3);
+        data.store("suggestion1");
+        data.store("suggestion2");
+        data.store("suggestion3");
+
+        List<Suggestion> suggestions = parser.parse(data);
+
+        assertThat(suggestions).hasSize(3);
+        assertThat(suggestions.get(0).getValue()).isEqualTo("suggestion1");
+        assertThat(suggestions.get(0).hasScore()).isFalse();
+        assertThat(suggestions.get(0).hasPayload()).isFalse();
+        assertThat(suggestions.get(1).getValue()).isEqualTo("suggestion2");
+        assertThat(suggestions.get(2).getValue()).isEqualTo("suggestion3");
+    }
+
+    @Test
+    void shouldParseSuggestionsWithScores() {
+        SuggestionParser parser = new SuggestionParser(true, false);
+        ArrayComplexData data = new ArrayComplexData(4);
+        data.store("suggestion1");
+        data.store(1.5);
+        data.store("suggestion2");
+        data.store(2.0);
+
+        List<Suggestion> suggestions = parser.parse(data);
+
+        assertThat(suggestions).hasSize(2);
+        assertThat(suggestions.get(0).getValue()).isEqualTo("suggestion1");
+        assertThat(suggestions.get(0).hasScore()).isTrue();
+        assertThat(suggestions.get(0).getScore()).isEqualTo(1.5);
+        assertThat(suggestions.get(0).hasPayload()).isFalse();
+        assertThat(suggestions.get(1).getValue()).isEqualTo("suggestion2");
+        assertThat(suggestions.get(1).getScore()).isEqualTo(2.0);
+    }
+
+    @Test
+    void shouldParseSuggestionsWithPayloads() {
+        SuggestionParser parser = new SuggestionParser(false, true);
+        ArrayComplexData data = new ArrayComplexData(4);
+        data.store("suggestion1");
+        data.store("payload1");
+        data.store("suggestion2");
+        data.store("payload2");
+
+        List<Suggestion> suggestions = parser.parse(data);
+
+        assertThat(suggestions).hasSize(2);
+        assertThat(suggestions.get(0).getValue()).isEqualTo("suggestion1");
+        assertThat(suggestions.get(0).hasScore()).isFalse();
+        assertThat(suggestions.get(0).hasPayload()).isTrue();
+        assertThat(suggestions.get(0).getPayload()).isEqualTo("payload1");
+        assertThat(suggestions.get(1).getValue()).isEqualTo("suggestion2");
+        assertThat(suggestions.get(1).getPayload()).isEqualTo("payload2");
+    }
+
+    @Test
+    void shouldParseSuggestionsWithScoresAndPayloads() {
+        SuggestionParser parser = new SuggestionParser(true, true);
+        ArrayComplexData data = new ArrayComplexData(6);
+        data.store("suggestion1");
+        data.store(1.5);
+        data.store("payload1");
+        data.store("suggestion2");
+        data.store(2.0);
+        data.store("payload2");
+
+        List<Suggestion> suggestions = parser.parse(data);
+
+        assertThat(suggestions).hasSize(2);
+        assertThat(suggestions.get(0).getValue()).isEqualTo("suggestion1");
+        assertThat(suggestions.get(0).hasScore()).isTrue();
+        assertThat(suggestions.get(0).getScore()).isEqualTo(1.5);
+        assertThat(suggestions.get(0).hasPayload()).isTrue();
+        assertThat(suggestions.get(0).getPayload()).isEqualTo("payload1");
+        assertThat(suggestions.get(1).getValue()).isEqualTo("suggestion2");
+        assertThat(suggestions.get(1).getScore()).isEqualTo(2.0);
+        assertThat(suggestions.get(1).getPayload()).isEqualTo("payload2");
+    }
+
+    @Test
+    void shouldParseSuggestionsWithStringScores() {
+        // a string-encoded score must be parsed into its numeric value
+        SuggestionParser parser = new SuggestionParser(true, false);
+        ArrayComplexData data = new ArrayComplexData(4);
+        data.store("hell");
+        data.store("2147483648");
+        data.store("hello");
+        data.store("0.70710676908493042");
+
+        List<Suggestion> suggestions = parser.parse(data);
+
+        assertThat(suggestions).hasSize(2);
+        assertThat(suggestions.get(0).getValue()).isEqualTo("hell");
+        assertThat(suggestions.get(0).getScore()).isEqualTo(2147483648.0);
+        assertThat(suggestions.get(1).getValue()).isEqualTo("hello");
+        assertThat(suggestions.get(1).getScore()).isEqualTo(0.70710676908493042);
+    }
+
+    @Test
+    void shouldParseSuggestionsWithStringScoresAndPayloads() {
+        // a string-encoded score must be parsed into its numeric value, alongside the payload
+        SuggestionParser parser = new SuggestionParser(true, true);
+        ArrayComplexData data = new ArrayComplexData(6);
+        data.store("hell");
+        data.store("1.5");
+        data.store("payload1");
+        data.store("hello");
+        data.store("2");
+        data.store("payload2");
+
+        List<Suggestion> suggestions = parser.parse(data);
+
+        assertThat(suggestions).hasSize(2);
+        assertThat(suggestions.get(0).getScore()).isEqualTo(1.5);
+        assertThat(suggestions.get(0).getPayload()).isEqualTo("payload1");
+        assertThat(suggestions.get(1).getScore()).isEqualTo(2.0);
+        assertThat(suggestions.get(1).getPayload()).isEqualTo("payload2");
+    }
+
+    @Test
+    void shouldParseUtf8EncodedSuggestionsWithScoresAndPayloads() {
+        SuggestionParser parser = new SuggestionParser(true, true);
+        EncodedComplexOutput<byte[], byte[], List<Suggestion>> output = new EncodedComplexOutput<>(ByteArrayCodec.INSTANCE,
+                parser);
+        output.multiArray(3);
+        output.set(utf8("hello"));
+        output.set(utf8("1.5"));
+        output.set(utf8("payload"));
+        output.complete(0);
+
+        List<Suggestion> suggestions = output.get();
+
+        assertThat(suggestions).hasSize(1);
+        assertThat(suggestions.get(0).getValue()).isEqualTo("hello");
+        assertThat(suggestions.get(0).getScore()).isEqualTo(1.5);
+        assertThat(suggestions.get(0).getPayload()).isEqualTo("payload");
+    }
+
+    @Test
+    void shouldHandleEmptyList() {
+        SuggestionParser parser = new SuggestionParser(false, false);
+        ArrayComplexData data = new ArrayComplexData(0);
+
+        List<Suggestion> suggestions = parser.parse(data);
+        assertThat(suggestions).isEmpty();
+    }
+
+    @Test
+    void shouldThrowExceptionForNullData() {
+        SuggestionParser parser = new SuggestionParser(false, false);
+
+        List<Suggestion> suggestions = parser.parse(null);
+        assertThat(suggestions).isEmpty();
+    }
+
+    @Test
+    void shouldThrowExceptionForInvalidScoreFormat() {
+        SuggestionParser parser = new SuggestionParser(true, false);
+        ArrayComplexData data = new ArrayComplexData(3);
+        data.store("suggestion1");
+        data.store("suggestion2");
+        data.store("suggestion3");
+
+        List<Suggestion> suggestions = parser.parse(data);
+        assertThat(suggestions).hasSize(0);
+    }
+
+    @Test
+    void shouldThrowExceptionForInvalidPayloadFormat() {
+        SuggestionParser parser = new SuggestionParser(false, true);
+        ArrayComplexData data = new ArrayComplexData(3);
+        data.store("suggestion1");
+        data.store("payload1");
+        data.store("suggestion2");
+
+        List<Suggestion> suggestions = parser.parse(data);
+        assertThat(suggestions).hasSize(0);
+    }
+
+    @Test
+    void shouldThrowExceptionForInvalidScoreAndPayloadFormat() {
+        SuggestionParser parser = new SuggestionParser(true, true);
+        ArrayComplexData data = new ArrayComplexData(5);
+        data.store("suggestion1");
+        data.store(1.5);
+        data.store("payload1");
+        data.store("suggestion2");
+        data.store(2.0);
+
+        List<Suggestion> suggestions = parser.parse(data);
+        assertThat(suggestions).hasSize(0);
+    }
+
+    private static ByteBuffer utf8(String value) {
+        return StringCodec.UTF8.encodeValue(value);
+    }
+
+}

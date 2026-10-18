@@ -1,0 +1,240 @@
+# New & Noteworthy
+
+
+## What's new in Lettuce 7.8
+
+- Support for the unified [`ZRANGE`](https://redis.io/docs/latest/commands/zrange/) syntax introduced in Redis 6.2 through new `zrange` and `zrangeWithScores` overloads (list-returning, plus streaming-channel variants on the sync and async APIs) accepting a `ZRange` selector: `ZRange.byIndex(start, stop)`, `ZRange.byScore(range)` (`BYSCORE`) or `ZRange.byLex(range)` (`BYLEX`). Each selector exposes only the options the server accepts for its kind — `rev()` on all three, `limit(...)` on score and lexicographical ranges — and `zrangeWithScores` has no lexicographical overload because `BYLEX` cannot be combined with `WITHSCORES`, so illegal combinations do not compile. Available in the sync, async, reactive, cluster node-selection and Kotlin APIs — a single entry point covering the `ZREVRANGE`, `ZRANGEBYSCORE`, `ZREVRANGEBYSCORE`, `ZRANGEBYLEX` and `ZREVRANGEBYLEX` variants
+- Deprecated the sorted-set range commands that Redis 6.2 superseded with the unified `ZRANGE` syntax: `zrangebylex`, `zrangebyscore`, `zrangebyscoreWithScores`, `zrevrange`, `zrevrangeWithScores`, `zrevrangebylex`, `zrevrangebyscore` and `zrevrangebyscoreWithScores` (all overloads, including the streaming-channel variants) on the sync, async, reactive and cluster node-selection APIs. Each `@deprecated` note names the `zrange`/`zrangeWithScores` overload and `ZRange` selector option (`rev()`, `limit(...)`) that replaces it. The Kotlin coroutine API no longer exposes these commands; use the `ZRange`-based `zrange`/`zrangeWithScores` functions instead
+- Deprecated the server-assisted client-side caching support (`ClientSideCaching`, `CacheFrontend`, `CacheAccessor`, `RedisCache` in `io.lettuce.core.support.caching`). This implementation is legacy and incomplete and is scheduled for removal in a future major release. There is no replacement yet — a redesigned client-side caching API is planned.
+- Fixed `ScriptOutputType.OBJECT` decoding so top-level scalar responses are returned directly instead of being treated as collections. Top-level integer responses now return `Long` instead of a one-element `List<Long>`; RESP arrays remain lists.
+- Fixed `XAUTOCLAIM` reply decoding for pending entries that were deleted from the stream (the third reply element added in Redis 7.0). With `JUSTID`, those deleted IDs are no longer misreported as claimed messages through `ClaimedMessages.getMessages()`; they are now exposed through the new `ClaimedMessages.getDeletedIds()`, which returns an empty list on Redis before 7.0.
+- Began making **Project Reactor an optional dependency** for the client's public API. Added `commands(CommandsFactory)` on the stateful connection interfaces (`StatefulRedisConnection` and the cluster, pub/sub and sentinel variants), which returns a command API bound to the connection and cached per factory. Command APIs now expose a static `factory()` — for example `RedisReactiveCommands.factory()` — so the reactive API can be obtained via `connection.commands(RedisReactiveCommands.factory())`. The `reactive()` accessor is deprecated in favor of this factory-based accessor.
+- Deprecated the Reactor-based `EventBus.get()` (which returns a `Flux<Event>`) in favor of a callback-based subscription API: `EventBus.subscribe(Consumer<Event>)` and `EventBus.subscribe(Class<T>, Consumer<T>)`, each returning an `io.lettuce.core.Subscription` that is closed to stop delivery. This lets event consumers avoid a direct dependency on Project Reactor.
+- Deprecated the Reactor (`Mono`) parts of the tracing SPI: `TraceContextProvider.getTraceContextLater()` (returning `Mono<TraceContext>`) is deprecated in favor of the callback-based `getTraceContextAsync(...)`, removing Project Reactor from the trace-context propagation path used by custom `TraceContextProvider` implementations.
+
+## What's new in Lettuce 7.7
+
+- [Probabilistic data structures (RedisBloom)](user-guide/probabilistic.md) support through `RedisBloomFilterCommands`, `RedisCuckooFilterCommands`, `RedisTopKCommands`, `RedisCMSCommands` and `RedisTDigestCommands`, with the respective async, reactive and Kotlin APIs — covering Bloom Filter (`BF.*`), Cuckoo Filter (`CF.*`), Top-K, Count-Min Sketch and T-Digest
+- Support for the `HIMPORT` command family for bulk-loading hashes that share the same field names, declaring the field names once per connection and sending only values per hash — see [Hash Import](user-guide/hash-import.md)
+- Support for the [`SUNIONCARD`](https://redis.io/docs/latest/commands/sunioncard/) and [`SDIFFCARD`](https://redis.io/docs/latest/commands/sdiffcard/) set cardinality commands
+- Support for the [`LMOVEM`](https://redis.io/docs/latest/commands/lmovem/) and [`BLMOVEM`](https://redis.io/docs/latest/commands/blmovem/) multi-element list move commands
+- Support for the `MAXCOUNT` and `MAXSIZE` options on [`XREAD`](https://redis.io/docs/latest/commands/xread/) and [`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup/)
+- Support for [`FT.ALIASLIST`](https://redis.io/docs/latest/commands/ft.aliaslist/) to list search index aliases
+- Support for the `VISMEMBER` Vector Set command — see [Redis Vector Sets](user-guide/vector-sets.md)
+- Support for [`CLIENT NO-TOUCH`](https://redis.io/docs/latest/commands/client-no-touch/) to control key access-time updates per connection
+
+## What's new in Lettuce 7.2
+
+- Support for [`FT.HYBRID`](https://redis.io/docs/latest/commands/ft.hybrid/) command enabling hybrid vector and full-text search queries
+- Ability to expose upstream driver libraries in [`CLIENT SETINFO`](https://redis.io/docs/latest/commands/client-setinfo/) payload for better client identification
+
+## What's new in Lettuce 7.1
+
+- Support for [`XREADGROUP`](https://redis.io/docs/latest/commands/xreadgroup/) with `CLAIM` argument for atomic message claiming in Redis Streams consumer groups
+- [Compare-and-Set (CAS) / Compare-and-Delete (CAD)](https://redis.io/docs/latest/commands/set/) commands through `DIGEST`, `DELEX` and `SET` extensions for optimistic locking patterns
+- Support for [`MSETEX`](https://redis.io/docs/latest/commands/msetex/) command to atomically set multiple keys with expiration
+
+## What's new in Lettuce 7.0
+
+- [Maintenance events support](advanced-usage/events.md) for graceful handling of Redis maintenance operations enabling hitless upgrades
+- Upgrade to [Netty 4.2](https://github.com/netty/netty/releases/tag/netty-4.2.0.Final) with adaptive memory allocator and improved threading model
+- [RediSearch](user-guide/redis-search.md) cluster mode support with cursor sticking and read operation distribution across nodes
+- String-based JSON API to avoid unnecessary byte-to-string conversions
+- Removal of deprecated APIs as part of major version cleanup
+
+## What’s new in Lettuce 6.8
+- [RediSearch support](user-guide/redis-search.md) through `RediSearchCommands` and the respective reactive, async and Kotlin APIs
+
+## What’s new in Lettuce 6.7
+- [VectorSet support](user-guide/vector-sets.md) through `RedisVectorSetCommands` and the respective reactive, async and Kotlin APIs
+- `ConnectionPoolSupport` also allows the user to provide custom connection validations
+
+## What’s new in Lettuce 6.6
+- Support `HGETDEL`, `HGETEX` and `HSETEX`
+- Introduce command replay filter to avoid command replaying after reconnect
+- Deprecate the STRALGO command and implement the LCS in its place
+- Token based authentication integration with core extension
+
+## What’s new in Lettuce 6.5
+
+- [RedisJSON support](user-guide/redis-json.md) through `RedisJSONCommands` and the respective reactive, async and Kotlin APIs
+- Complete support for all `CLUSTER` commands (added `CLUSTER MYSHARDID` and `CLUSTER LINKS`)
+- Added support for the `CLIENT TRACKING` command
+- Migrated the documentation to [MkDocs](https://www.mkdocs.org/)
+
+## What’s new in Lettuce 6.4
+
+- [Hash Field Expiration](https://redis.io/docs/latest/develop/data-types/hashes/#field-expiration) is now fully supported
+- [Sharded Pub/Sub](https://redis.io/docs/latest/develop/interact/pubsub/#sharded-pubsub) is now fully supported
+- Support `CLIENT KILL` with `[MAXAGE]` parameter and `HSCAN` with `NOVALUES` parameter
+
+## What’s new in Lettuce 6.3
+
+- [Redis Function support](user-guide/redis-functions.md) (`fcall` and `FUNCTION`
+  commands).
+
+- Support for Library Name and Version through `LettuceVersion`.
+  Automated registration of the Lettuce library version upon connection
+  handshake.
+
+- Support for Micrometer Tracing to trace observations (distributed
+  tracing and metrics).
+
+## What’s new in Lettuce 6.2
+
+- [`RedisCredentialsProvider`](user-guide/connecting-redis.md#authentication) abstraction to
+  externalize credentials and credentials rotation.
+
+- Retrieval of Redis Cluster node connections using `ConnectionIntent`
+  to obtain read-only connections.
+
+- Master/Replica now uses `SENTINEL REPLICAS` to discover replicas
+  instead of `SENTINEL SLAVES`.
+
+## What’s new in Lettuce 6.1
+
+- Kotlin Coroutines support for `SCAN`/`HSCAN`/`SSCAN`/`ZSCAN` through
+  `ScanFlow`.
+
+- Command Listener API through
+  `RedisClient.addListener(CommandListener)`.
+
+- [Micrometer support](advanced-usage/observability.md#micrometer) through
+  `MicrometerCommandLatencyRecorder`.
+
+- [Experimental support for `io_uring`](advanced-usage/native-transports.md).
+
+- Configuration of extended Keep-Alive options through
+  `KeepAliveOptions` (only available for some transports/Java versions).
+
+- Configuration of netty's `AddressResolverGroup` through
+  `ClientResources`. Uses `DnsAddressResolverGroup` when
+  `netty-resolver-dns` is on the classpath.
+
+- Add support for Redis ACL commands.
+
+- [Java Flight Recorder Events](advanced-usage/observability.md#java-flight-recorder-events-since-61)
+
+## What’s new in Lettuce 6.0
+
+- Support for RESP3 usage with Redis 6 along with RESP2/RESP3 handshake
+  and protocol version discovery.
+
+- ACL authentication using username and password or password-only
+  authentication.
+
+- Cluster topology refresh is now non-blocking.
+
+- [Kotlin Coroutine Extensions](user-guide/kotlin-api.md).
+
+- RxJava 3 support.
+
+- Refined Scripting API accepting the Lua script either as `byte[]` or
+  `String`.
+
+- Connection and Queue failures now no longer throw an exception but
+  properly associate the failure with the Future handle.
+
+- Removal of deprecated API including timeout methods accepting
+  `TimeUnit`. Use methods accepting `Duration` instead.
+
+- Lots of internal refinements.
+
+- `xpending` methods return now `List<PendingMessage>` and
+  `PendingMessages`
+
+- Spring support removed. Use Spring Data Redis for a seamless Spring
+  integration with Lettuce.
+
+- `AsyncConnectionPoolSupport.createBoundedObjectPool(…)` methods are
+  now blocking to await pool initialization.
+
+- `DecodeBufferPolicy` for fine-grained memory reclaim control.
+
+- `RedisURI.toString()` renders masked password.
+
+- `ClientResources.commandLatencyCollector(…)` refactored into
+  `ClientResources.commandLatencyRecorder(…)` returning
+  `CommandLatencyRecorder`.
+
+## What’s new in Lettuce 5.3
+
+- Improved SSL configuration supporting Cipher suite selection and
+  PEM-encoded certificates.
+
+- Fixed method signature for `randomkey()`.
+
+- Un-deprecated `ClientOptions.pingBeforeActivateConnection` to allow
+  connection verification during connection handshake.
+
+## What’s new in Lettuce 5.2
+
+- Allow randomization of read candidates using Redis Cluster.
+
+- SSL support for Redis Sentinel.
+
+## What’s new in Lettuce 5.1
+
+- Add support for `ZPOPMIN`, `ZPOPMAX`, `BZPOPMIN`, `BZPOPMAX` commands.
+
+- Add support for Redis Command Tracing through Brave, see [Configuring
+  Client resources](advanced-usage/client-resources.md).
+
+- Add support for [Redis
+  Streams](https://redis.io/topics/streams-intro).
+
+- Asynchronous `connect()` for Master/Replica connections.
+
+- [Asynchronous Connection Pooling](advanced-usage/connection-pooling.md#asynchronous-connection-pooling)
+  through `AsyncConnectionPoolSupport` and `AsyncPool`.
+
+- Dedicated exceptions for Redis `LOADING`, `BUSY`, and `NOSCRIPT`
+  responses.
+
+- Commands in at-most-once mode (auto-reconnect disabled) are now
+  canceled already on disconnect.
+
+- Global command timeouts (also for reactive and asynchronous API usage)
+  configurable through [Client Options](advanced-usage/client-options.md).
+
+- Host and port mappers for Lettuce usage behind connection
+  tunnels/proxies through `SocketAddressResolver`, see [Configuring
+  Client resources](advanced-usage/client-resources.md).
+
+- `SCRIPT LOAD` dispatch to all cluster nodes when issued through
+  `RedisAdvancedClusterCommands`.
+
+- Reactive `ScanStream` to iterate over the keyspace using `SCAN`
+  commands.
+
+- Transactions using Master/Replica connections are bound to the master
+  node.
+
+## What’s new in Lettuce 5.0
+
+- New artifact coordinates: `io.lettuce:lettuce-core` and packages moved
+  from `com.lambdaworks.redis` to `io.lettuce.core`.
+
+- [Reactive API](user-guide/reactive-api.md) now Reactive Streams-based using
+  [Project Reactor](https://projectreactor.io/).
+
+- [Redis Command
+  Interfaces](redis-command-interfaces.md) supporting
+  dynamic command invocation and Redis Modules.
+
+- Enhanced, immutable Key-Value objects.
+
+- Asynchronous Cluster connect.
+
+- Native transport support for Kqueue on macOS systems.
+
+- Removal of support for Guava.
+
+- Removal of deprecated `RedisConnection` and `RedisAsyncConnection`
+  interfaces.
+
+- Java 9 compatibility.
+
+- HTML and PDF reference documentation along with a new project website:
+  <https://lettuce.io>.
+
